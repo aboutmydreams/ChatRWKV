@@ -203,9 +203,7 @@ def run_rnn(tokens, newline_adj = 0):
 all_state = {}
 def save_all_stat(srv, name, last_out):
     n = f'{name}_{srv}'
-    all_state[n] = {}
-    all_state[n]['out'] = last_out
-    all_state[n]['rnn'] = copy.deepcopy(model_state)
+    all_state[n] = {'out': last_out, 'rnn': copy.deepcopy(model_state)}
     all_state[n]['token'] = copy.deepcopy(model_tokens)
 
 def load_all_stat(srv, name):
@@ -249,19 +247,15 @@ def on_message(message):
     x_top_p = GEN_TOP_P
     if ("-temp=" in msg):
         x_temp = float(msg.split("-temp=")[1].split(" ")[0])
-        msg = msg.replace("-temp="+f'{x_temp:g}', "")
-        # print(f"temp: {x_temp}")
+        msg = msg.replace(f'-temp={x_temp:g}', "")
+            # print(f"temp: {x_temp}")
     if ("-top_p=" in msg):
         x_top_p = float(msg.split("-top_p=")[1].split(" ")[0])
-        msg = msg.replace("-top_p="+f'{x_top_p:g}', "")
-        # print(f"top_p: {x_top_p}")
-    if x_temp <= 0.2:
-        x_temp = 0.2
-    if x_temp >= 5:
-        x_temp = 5
-    if x_top_p <= 0:
-        x_top_p = 0
-    
+        msg = msg.replace(f'-top_p={x_top_p:g}', "")
+            # print(f"top_p: {x_top_p}")
+    x_temp = max(x_temp, 0.2)
+    x_temp = min(x_temp, 5)
+    x_top_p = max(x_top_p, 0)
     if msg == '+reset':
         out = load_all_stat('', 'chat_init')
         save_all_stat(srv, 'chat', out)
@@ -292,7 +286,7 @@ def on_message(message):
             real_msg = msg[4:].strip()
             new = f"{user}{interface} {real_msg}\n\n{bot}{interface}"
             # print(f'### qa ###\n[{new}]')
-            
+
             out = run_rnn(tokenizer.encode(new))
             save_all_stat(srv, 'gen_0', out)
 
@@ -323,7 +317,7 @@ def on_message(message):
                 out = run_rnn([token], newline_adj=-2)
             else:
                 out = run_rnn([token])
-            
+
             xxx = tokenizer.decode(model_tokens[out_last:])
             if '\ufffd' not in xxx: # avoid utf-8 display issues
                 print(xxx, end='', flush=True)
@@ -374,12 +368,12 @@ def on_message(message):
             if '\ufffd' not in xxx: # avoid utf-8 display issues
                 print(xxx, end='', flush=True)
                 out_last = begin + i + 1
-            
+
             send_msg = tokenizer.decode(model_tokens[begin:])
             if '\n\n' in send_msg:
                 send_msg = send_msg.strip()
                 break
-            
+
             # send_msg = tokenizer.decode(model_tokens[begin:]).strip()
             # if send_msg.endswith(f'{user}{interface}'): # warning: needs to fix state too !!!
             #     send_msg = send_msg[:-len(f'{user}{interface}')].strip()
