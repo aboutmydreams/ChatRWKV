@@ -9,7 +9,7 @@ except:
     pass
 import numpy as np
 np.set_printoptions(precision=4, suppress=True, linewidth=200)
-with open(f"misc/lambada_test.jsonl", "r", encoding="utf-8") as f:
+with open("misc/lambada_test.jsonl", "r", encoding="utf-8") as f:
     todo = [json.loads(line) for line in f]
     todo = [[doc['text'].rsplit(' ', 1)[0], " " + doc['text'].rsplit(' ', 1)[1]] for doc in todo]
 args = types.SimpleNamespace()
@@ -60,9 +60,8 @@ model = RWKV_RNN(args)
 
 print('Running...')
 xsum = 0
-xcnt = 0
 xacc = 0
-for d in todo:
+for xcnt, d in enumerate(todo, start=1):
     src = PAD_SEQ + tokenizer.encode(d[0])
     dst = tokenizer.encode(d[1])
 
@@ -79,8 +78,7 @@ for d in todo:
         pred = s_index[0].item()
         if pred != dst[i]:
             correct = False
-    
-    xcnt += 1
+
     xsum += logits
     xacc += 1 if correct else 0
     if xcnt % 100 == 0 or xcnt == len(todo):

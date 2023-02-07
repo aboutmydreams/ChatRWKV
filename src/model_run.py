@@ -29,30 +29,30 @@ class RWKV_RNN(MyModule):
         super().__init__()
 
         self.args = args
-        if args.FLOAT_MODE == 'fp32':
-            self.FLOAT_MODE = torch.float
+        if args.FLOAT_MODE == 'bf16':
+            self.FLOAT_MODE = torch.bfloat16
         elif args.FLOAT_MODE == 'fp16':
             self.FLOAT_MODE = torch.half
-        elif args.FLOAT_MODE == 'bf16':
-            self.FLOAT_MODE = torch.bfloat16
+        elif args.FLOAT_MODE == 'fp32':
+            self.FLOAT_MODE = torch.float
         self.RUN_DEVICE = args.RUN_DEVICE
 
         with torch.no_grad():
-            w = torch.load(args.MODEL_NAME + '.pth', map_location='cpu')
+            w = torch.load(f'{args.MODEL_NAME}.pth', map_location='cpu')
             keys = list(w.keys()) # refine weights and send to correct device
             print_need_newline = False
             for x in keys:
                 w[x].requires_grad = False
                 if x == 'emb.weight' or 'ln0' in x:
                     continue
-                
+
                 block_id = int(x.split('.')[1]) if ('blocks.' in x) else 0
-                
+
                 if '.time_' in x:
                     w[x] = w[x].squeeze()
                 if 'key.weight' in x or 'value.weight' in x or 'receptance.weight' in x or 'output.weight' in x:
                     w[x] = w[x].t()
-                
+
                 if '.time_decay' in x:
                     w[x] = w[x].float()
                     w[x] = -torch.exp(w[x])
@@ -65,7 +65,7 @@ class RWKV_RNN(MyModule):
                     w[x] = w[x] / (2 ** int(block_id // RWKV_RESCALE_LAYER))
                 if 'ffn.value.weight' in x:
                     w[x] = w[x] / (2 ** int(block_id // RWKV_RESCALE_LAYER))
-                
+
                 if args.RUN_DEVICE == 'cuda':
                     w[x] = w[x].cuda()
 
@@ -216,7 +216,7 @@ class RWKV_RNN(MyModule):
             if self.RUN_DEVICE == 'cuda':
                 x = x.cuda()
 
-            if state == None:
+            if state is None:
                 state = torch.zeros(args.n_layer * 5, args.n_embd, device=self.RUN_DEVICE)
                 for i in range(args.n_layer):
                     state[5*i+4] -= 1e30
@@ -229,12 +229,12 @@ class RWKV_RNN(MyModule):
                 x = x + SA(self.LN(x, w.blocks[i].ln1), state, i, 
                     ww.time_mix_k, ww.time_mix_v, ww.time_mix_r, ww.time_first, ww.time_decay, 
                     ww.key.weight, ww.value.weight, ww.receptance.weight, ww.output.weight)
-                
+
                 ww = w.blocks[i].ffn
                 x = x + FF(self.LN(x, w.blocks[i].ln2), state, i, 
                     ww.time_mix_k, ww.time_mix_r, 
                     ww.key.weight, ww.value.weight, ww.receptance.weight)
-                
+
                 if (i+1) % RWKV_RESCALE_LAYER == 0:
                     x = x / 2
 
